@@ -1,0 +1,14 @@
+fastapi==0.110.2
+uvicorn==0.29.0
+pydantic==2.7.1
+scikit-learn==1.4.2
+numpy==1.26.4
+scipy==1.13.0
+pandas==2.2.2
+spacy==3.7.4
+pdfminer.six==20231228
+pypdf==4.2.0
+joblib==1.4.2
+python-multipart==0.0.9
+pytest==8.2.1
+
