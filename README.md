@@ -1,92 +1,96 @@
-# ConsentLens
+ConsentLens
 
-Local, explainable privacy risk analyzer for the files that live on your machine. ConsentLens ingests plaintext, markdown, and PDF documents; runs transparent TF-IDF + logistic regression models; and surfaces human-readable explanations so you can understand what an attacker could infer from different slices of your digital exhaust.
+ConsentLens is a local, explainable privacy risk analysis system that explores what personal attributes can be inferred from everyday personal documents under different attacker visibility assumptions. The project prioritizes transparency, auditability, and interpretability over predictive performance, with the goal of making privacy leakage inspectable rather than opaque.
 
-## Highlights
-- Local-only processing – the backend never makes network calls.
-- Simple heuristics categorize files into `email`, `notes`, `cv`, `transcript`, or `other`.
-- Attribute models (location region, field of study, work status, income bracket) are trained with scikit-learn and persisted as `joblib` artifacts.
-- Explanation layer remaps top TF-IDF features back to actual sentences for justification.
-- Risk simulation compares attacker views: emails only, notes only, CV only, and all data.
-- Minimal React + Vite UI for ingestion, summaries, and side-by-side scenario cards.
+Rather than treating inference as a black box, ConsentLens surfaces human-readable justifications—mapping model features back to concrete sentences—so users can understand why specific attributes are inferred and under what data exposure scenarios.
 
-## Repository Layout
-```
-backend/        FastAPI app, ingestion pipeline, explainability + inference
-backend/models  Training script and pre-trained artifacts
-backend/analysis Scenario orchestration for attacker slices
-backend/ingestion File + PDF readers and cleaners
-backend/explanation Feature → sentence mapper (spaCy sentencizer)
-backend/schemas  Pydantic request/response contracts
-data/           Demo CSV used to train sample models
-tests/          Pytest suites for ingestion and inference
+Motivation
+
+Modern ML systems can infer sensitive personal attributes from seemingly innocuous text. However, most privacy analyses focus on aggregate risk or abstract metrics, offering little insight into what information is being used or how partial data exposure changes inference behavior.
+
+ConsentLens investigates a simple question:
+
+Given different slices of a person’s local data (e.g., emails only vs. CV only), what attributes can be inferred, and what evidence supports those inferences?
+
+System Overview
+
+ConsentLens operates entirely locally and consists of three main stages:
+
+Ingestion
+Plaintext, Markdown, and PDF documents are ingested and lightly cleaned. Simple heuristics categorize files into coarse types (email, notes, CV, transcript, other).
+
+Inference
+Attribute classifiers (TF-IDF + logistic regression) predict coarse attributes such as region, field of study, work status, or income bracket. Models are intentionally simple to preserve interpretability.
+
+Explanation & Risk Simulation
+Feature importances are mapped back to the sentences that contributed most strongly to each prediction. The system compares multiple attacker views (e.g., emails only, notes only, all documents) to highlight how inference risk changes with visibility.
+
+Design Rationale
+
+Several design choices were made deliberately:
+
+Linear models over deep models
+TF-IDF + logistic regression were chosen to favor interpretability and stability over raw accuracy.
+
+Local-only execution
+All computation happens on-device to avoid introducing new privacy risks during analysis.
+
+Explicit attacker modeling
+Inference is evaluated under partial data exposure scenarios rather than assuming full access.
+
+Sentence-level explanations
+Explanations are grounded in actual text spans to make inferences debuggable by humans.
+
+Repository Structure
+backend/        FastAPI backend, ingestion + inference pipeline
+backend/models  Training scripts and persisted model artifacts
+backend/analysis Attacker scenario orchestration
+backend/ingestion File and PDF readers
+backend/explanation Feature-to-sentence mapping
+backend/schemas  Pydantic request/response models
 ui/             React (Vite) frontend
-requirements.txt Python dependencies
-```
+data/           Synthetic demo training data
+tests/          Pytest suites for ingestion and inference
 
-## Prerequisites
-- Python 3.10+
-- Node.js 18+ (for the UI)
-- (Recommended) A virtual environment for Python dependencies
+Usage (Local)
 
-## Backend Setup
-```bash
-# from the repo root
+Backend
+
 python -m venv .venv
-.venv\Scripts\activate           # Windows
-# source .venv/bin/activate      # macOS / Linux
+source .venv/bin/activate
 pip install -r requirements.txt
-```
+uvicorn backend.app:app --reload
 
-### Train or Refresh Demo Models
-Pre-trained artifacts live under `backend/models/artifacts/`. Re-train them any time using the bundled synthetic dataset:
-```bash
-python backend/models/train_models.py
-# or specify custom data / output paths:
-# python backend/models/train_models.py --data-path data/demo_training_data.csv --output-dir backend/models/artifacts
-```
 
-### Run the API
-```bash
-uvicorn backend.app:app --reload --host 127.0.0.1 --port 8000
-```
-Key endpoints (auto-documented at `/docs`):
-- `GET /health` – readiness probe.
-- `POST /ingest` – body `{ "folder_path": "/path/to/files" }`; returns counts + previews.
-- `GET /documents` – list of stored docs.
-- `GET /documents/{doc_id}` – raw + clean text for one doc.
-- `POST /analyze` – optional `doc_types` filter; returns scenario-level predictions with supporting sentences.
+Frontend
 
-## UI Setup
-```bash
 cd ui
 npm install
 npm run dev
-```
-The UI expects the API at `http://localhost:8000` by default. Override by defining `VITE_API_BASE_URL` in a `.env` file or your shell before `npm run dev`.
-
-## End-to-End Flow
-1. Start the FastAPI backend (`uvicorn …`).
-2. Launch the Vite dev server (`npm run dev`), then open the printed URL (typically `http://localhost:5173`).
-3. Enter a folder path containing `.txt`, `.md`, or `.pdf` files and ingest.
-4. Review ingestion counts and document previews.
-5. Click **Run Privacy Risk Analysis** to compare attacker scenarios:
-   - Only emails
-   - Only notes
-   - Only CVs
-   - All data
-6. Each scenario lists attribute predictions, confidence, and the sentences that contributed to the inference.
-
-## Running Tests
-```bash
-pytest
-```
-`test_ingestion.py` verifies recursive file handling and doc-type detection. `test_inference.py` retrains the toy models in a temp directory and ensures predictions include confidences and top features.
-
-## Assumptions & Notes
-- File classification relies on filename keywords (`cv`, `resume`, `note`, etc.). Adjust `detect_doc_type` for finer-grained rules.
-- SpaCy’s lightweight English pipeline with a sentencizer is used to avoid large model downloads.
-- All computation is in-memory; there is no persistence layer yet.
-- Models are illustrative only—they are trained on a small synthetic dataset to demonstrate end-to-end behavior.
 
 
+The UI connects to the backend at http://localhost:8000 by default.
+
+Limitations
+
+Models are trained on a small synthetic dataset and are not intended for real-world deployment.
+
+Document type detection relies on filename heuristics.
+
+The system does not currently model adversarial manipulation of input text.
+
+No persistence layer is implemented; all analysis is in-memory.
+
+Possible Extensions
+
+Studying how explanation fidelity degrades under document obfuscation or redaction.
+
+Comparing linear explanations with attention- or gradient-based attribution methods.
+
+Evaluating user trust when explanations are incomplete or conflicting.
+
+Extending attacker models to include temporal or cross-document correlations.
+
+Notes
+
+This project is intended as an exploratory research system rather than a production privacy tool. The emphasis is on understanding what is inferred and why, not on maximizing predictive accuracy.
